@@ -2,8 +2,57 @@ local awful = require("awful")
 local math = math
 
 local mylayout = {}
+local capi =
+{
+    mouse = mouse,
+    mousegrabber = mousegrabber,
+}
 
 mylayout.name = "centered"
+
+function mylayout.mouse_resize_handler(_, _, _, _)
+    local c = awful.client.getmaster()
+    local area = c.screen.workarea
+    local client_count = #c.screen.tiled_clients
+    local master_area_width = area.width * c.screen.selected_tag.master_width_factor
+    local slave_width = 0.5 * (area.width - master_area_width)
+
+    if client_count > 2 then
+        if  capi.mouse.coords().x > area.x + area.width/2 then
+            capi.mouse.coords({x = area.x + slave_width + master_area_width, y = c.y + c.height/2})
+        else
+            capi.mouse.coords({x = area.x + slave_width, y = c.y + c.height/2})
+        end
+    elseif client_count == 2 then
+        capi.mouse.coords({x = area.x + master_area_width, y = c.y + c.height/2})
+    else
+        capi.mouse.coords({x = c.x + c.width/2, y = c.y + c.height/2})
+    end
+
+    capi.mousegrabber.run(function (_mouse)
+        if not c.valid then return false end
+        local fact_x = c.screen.selected_tag.master_width_factor
+
+        for _, v in ipairs(_mouse.buttons) do
+            if v then
+                if client_count > 2 then
+                    if _mouse.x > area.x + area.width/2 then
+                        fact_x = (((_mouse.x - area.x) / area.width)*1.333)-0.5
+                    else
+                        fact_x = ((( area.x + area.width - _mouse.x) / area.width)*1.333)-0.5
+                    end
+                elseif client_count == 2 then
+                    fact_x = (_mouse.x - area.x) / area.width
+                else
+                    return false
+                end
+                c.screen.selected_tag.master_width_factor = math.min(math.max(fact_x, 0.30), 0.75)
+                return true
+            end
+        end
+        return false
+    end, "sb_h_double_arrow")
+end
 
 function mylayout.arrange(p)
     local area = p.workarea
